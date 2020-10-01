@@ -8,7 +8,7 @@ Amazon Customer Reviews (a.k.a. Product Reviews) is one of Amazon’s iconic pro
 #### Approach
 1.	The Review classification is NLP machine learning model to predict whether a review posted by the customer is positive or negative. For the sake of simplification, we have converted the ratings provided by the customer into a binary target variable with value equals to 1 when ratings were either 4 or 5.
 
-2.	In present work, after splitting the data into train and test we created a feature engineering pipeline on training data using natural language processing techniques. The dataset was further split into 10 chunks to demonstrate distributed learning, where during training not more than a single chunk is loaded on the memory at a time.
+2.	In present work, we split the data into train valdiation and test. Train data is used for training while validation data is used to evaluate different hyperparameters.  
 
 3.	The data was trained using SageMaker bring your own custom Docker container. In the present example the training script consisted of following function and their implementation.
     1. Dockerfile with steps to build the docker and mounting necessary drivers for GPU enabled training
