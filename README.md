@@ -1,4 +1,4 @@
-## Implementing a Review classification model with Keras, MXNet and SageMaker
+## Implementing a Review classification model with Catboost and SageMaker
 The solution demonstrates a Distributed Learning system implementing Keras custom generator to train on sprase libsvm data.
 
 #### Background
