@@ -1,0 +1,299 @@
+#!/usr/bin/python3
+
+# A sample train component that trains a simple scikit-learn decision tree model.
+# This implementation works in File mode and makes no assumptions about the input file names.
+# Input is specified as CSV with a data point in each row and the labels in the first column.
+
+from __future__ import print_function
+
+import os
+import io
+import re
+import math
+import json
+import pickle
+import sys
+import traceback
+import argparse
+import datetime
+import gc
+import glob
+import logging
+import shutil
+import subprocess
+import tempfile
+import time
+import pandas as pd
+import csv
+import joblib
+
+import numpy as np
+from catboost import CatBoostClassifier, Pool as CatboostPool, cv
+from itertools import chain
+from pandas.api.types import CategoricalDtype
+from sklearn import metrics
+
+prefix = '/opt/ml/'
+
+input_path = prefix + 'input/data'
+output_path = os.path.join(prefix, 'output')
+model_path = os.path.join(prefix, 'model')
+param_path = os.path.join(prefix, 'input/config/hyperparameters.json')
+
+# This algorithm has a single channel of input data called 'train'. Since we run in
+# File mode, the input files are copied to the directory specified here.
+train_channel_name = 'train'
+validation_chanel_name = 'validation'
+training_path = os.path.join(input_path, train_channel_name)
+validation_path = os.path.join(input_path, validation_chanel_name)
+## added new column browse node
+
+cols = ['verified_purchase','review_headline','review_body','product_title','helpful_votes']
+
+numerical_cols = ['helpful_votes']
+categorical_cols = ['verified_purchase']
+
+text_cols = ['review_headline', 'review_body', 'product_title']
+
+def ret_pool_obj(X):
+    pool_obj = CatboostPool(
+        data=X,
+        label=None,
+        text_features=text_cols,
+        cat_features=categorical_cols,
+        feature_names=list(X.columns)
+    )
+    return pool_obj
+
+
+def fit_catboost(X_train, y_train, weight, catboost_params={}, verbose=100):
+    learn_pool = CatboostPool(
+        X_train,
+        y_train,
+        weight=weight,
+        text_features=text_cols,
+        cat_features=categorical_cols,
+        feature_names=list(X_train.columns)
+    )
+    catboost_default_params = {
+        'iterations': 25000,
+        'learning_rate': 0.05,
+        'eval_metric': 'AUC',
+        'task_type': 'GPU'
+    }
+
+    catboost_default_params.update(catboost_params)
+
+    model = CatBoostClassifier(**catboost_params)
+    model.fit(learn_pool, verbose=verbose)
+
+    return model
+
+
+def pre_process(df):
+    df.fillna(
+        value={'review_headline': '', 'review_body': '', 'product_title': ''}, inplace=True)
+    df.fillna(
+        value={'verified_purchase': 'Unk'}, inplace=True)
+
+    df.fillna(-9999, inplace=True)
+    return df
+
+
+def pre_process_cat(df, obj_col_categories):
+    for col_name in categorical_cols:
+        print(col_name)
+        cat_type = CategoricalDtype(categories=obj_col_categories.get(col_name), ordered=False)
+        df[col_name] = df[col_name].astype(cat_type, copy=False)
+    col_names = df.columns
+    category_col_names = col_names[df.dtypes == 'category']
+    # Fill Unk values in new data (categories column) with -9999
+
+    for category in category_col_names:
+        df[category].fillna('Unk', inplace=True)
+    return df
+
+
+# The function to execute the train.
+def train(args):
+    print('Starting the train.')
+    try:
+        print(training_path)
+        with open(param_path, 'r') as tc:
+            trainingParams = json.load(tc)
+
+        print(training_path)
+        print(validation_path)
+        hpo_flag = args.HPO
+
+        print(hpo_flag)
+        # Take the set of files and read them all into a single pandas dataframe
+        input_files = [os.path.join(training_path, file) for file in os.listdir(training_path)]
+        if len(input_files) == 0:
+            raise ValueError(('There are no files in {}.\n' +
+                              'This usually indicates that the channel ({}) was incorrectly specified,\n' +
+                              'the data specification in S3 was incorrectly specified or the role specified\n' +
+                              'does not have permission to access the data.').format(training_path, train_channel_name))
+        #  change to this when you have headers in the data.
+        raw_data = [
+            pd.read_csv(file, sep='\t', lineterminator='\n', quotechar='"', quoting=csv.QUOTE_ALL) for
+            file in input_files]
+        raw_df = pd.concat(raw_data)
+
+        print('read the data', raw_df.dtypes)
+        raw_df = pre_process(raw_df)
+        #raw_df['bow'] = raw_df[combined_cols].apply(lambda x: ' '.join(x), axis=1)
+        train_data = raw_df.copy(deep=True)
+
+        print('Training data shape after revison: ', train_data.shape)
+
+        print('After reading the data:')
+        if (hpo_flag == 1):
+            input_files = [os.path.join(validation_path, file) for file in os.listdir(validation_path)]
+            if len(input_files) == 0:
+                raise ValueError(('There are no files in {}.\n' +
+                                  'This usually indicates that the channel ({}) was incorrectly specified,\n' +
+                                  'the data specification in S3 was incorrectly specified or the role specified\n' +
+                                  'does not have permission to access the data.').format(validation_path,
+                                                                                         validation_chanel_name))
+            # data reading from validation set
+            raw_data = [
+                pd.read_csv(file, sep='\t', lineterminator='\n', quotechar='"', quoting=csv.QUOTE_ALL) for
+                file in input_files]
+            raw_df = pd.concat(raw_data)
+            raw_df = pre_process(raw_df)
+            validation_data = raw_df.copy(deep=True)
+            print('validation data', validation_data.shape)
+
+        print('Training data shape :- ', train_data.shape)
+        print('Training data columns :- ', train_data.columns)
+
+        obj_col_categories = {}
+        for col_name in categorical_cols:
+            cat = [list(train_data[col_name].value_counts().to_dict().keys()) + ['Unk']]
+            print(col_name,': Categorical Levels: ',len(cat[0]))
+            obj_col_categories[col_name] = set(chain.from_iterable(cat))
+            cat_type = CategoricalDtype(categories=obj_col_categories.get(col_name), ordered=False)
+            train_data[col_name] = train_data[col_name].astype(cat_type, copy=False)
+            train_data[col_name].fillna('Unk', inplace=True)
+
+        start_time = time.time()
+        print("-Time to fit-- %s seconds ---" % (time.time() - start_time))
+
+        print('Hyper-parameter optimization flag : ', hpo_flag)
+
+        iterations = trainingParams.get('iterations', None)
+        if iterations is not None:
+            iterations = int(iterations)
+        else:
+            iterations = 50000
+
+        learning_rate = trainingParams.get('learning_rate', None)
+        if learning_rate is None:
+            learning_rate = 0.05
+        else:
+            learning_rate = float(learning_rate)
+
+        max_depth = trainingParams.get('max_depth', None)
+        if max_depth is None:
+            max_depth = 10
+        else:
+            max_depth = int(max_depth)
+
+        max_ctr_complexity = trainingParams.get('max_ctr_complexity', None)
+        if max_ctr_complexity is None:
+            max_ctr_complexity = 15
+        else:
+            max_ctr_complexity = int(max_ctr_complexity)
+
+        if (hpo_flag == 1):
+            print('Files in the validation channel')
+            validation_data = pre_process_cat(validation_data, obj_col_categories)
+            print("-Time to Train HPO =1 -- %s seconds ---" % (time.time() - start_time))
+
+        print('Training Started:- ')
+        # scale_pos_weight_fct = train_data['target'].value_counts()[0]/train_data['target'].value_counts()[1]
+        scale_pos_weight_fct = train_data['target'].value_counts()
+        print("scale_pos_weight_fct:", scale_pos_weight_fct)
+        weight = [1.0] * train_data.shape[0]  ## setting
+
+        params = {
+            'iterations': iterations,  ##50000
+            'depth': max_depth,  # 10
+            'learning_rate': learning_rate,  ## 0.05,
+            'loss_function': 'Logloss',
+            'eval_metric': 'Logloss',
+            'random_seed': 42,
+            'border_count': 254,
+            'logging_level': 'Verbose',
+            'use_best_model': False,
+            'max_ctr_complexity': max_ctr_complexity,  ##15
+            'early_stopping_rounds': 500,  # 10% of the total training epoch is a reasonable choice
+            'task_type': "GPU",
+            'one_hot_max_size': 253,
+            'metric_period': 100,
+            'text_processing': ['0~BoW:top_tokens_count=500+Text_char_3gram_hdline',
+                                '1~BoW:top_tokens_count=5000+Text_char_3gram_body',
+                                '2~BoW:top_tokens_count=500+Text_char_3gram_title'
+                                ],
+            'dictionaries': [
+                'Text_char_3gram_hdline:token_level_type=Letter,max_dict_size=10000,gram_order=3,min_token_occurrence=100',
+                'Text_char_3gram_body:token_level_type=Letter,max_dict_size=100000,gram_order=3,min_token_occurrence=100',
+                'Text_char_3gram_title:token_level_type=Letter,max_dict_size=10000,gram_order=3,min_token_occurrence=100'
+            ]
+        }
+        model = fit_catboost(train_data[numerical_cols + categorical_cols + text_cols], train_data["target"], weight,
+                             catboost_params=params)
+
+        print("-Time to Train HPO =0 -- %s seconds ---" % (time.time() - start_time))
+
+        if (hpo_flag == 1):
+            input_pool = ret_pool_obj(validation_data[numerical_cols + categorical_cols + text_cols])
+            prob = model.predict_proba(input_pool)[:, 1]
+            precision, recall, thresholds = metrics.precision_recall_curve(validation_data['target'].values, prob)
+            auc = metrics.auc(recall, precision)
+            print('auc:', auc)
+
+        model.save_model(os.path.join(model_path, 'model-classification-prod'), format="cbm", export_parameters=None,
+                         pool=None)
+        with open(os.path.join(model_path, 'obj_col_categories.pkl'), 'wb') as out:
+            print('Saving the model: ')
+            pickle.dump(obj_col_categories, out)
+
+        print('Training complete.')
+    except Exception as e:
+        # Write out an error file. This will be returned as the failureReason in the
+        # DescribeTrainingJob result.
+        trc = traceback.format_exc()
+        with open(os.path.join(output_path, 'failure'), 'w') as s:
+            s.write('Exception during train: ' + str(e) + '\n' + trc)
+        # Printing this causes the exception to be in the train job logs, as well.
+        print('Exception during train: ' + str(e) + '\n' + trc, file=sys.stderr)
+        # A non-zero exit code causes the train job to be marked as Failed.
+        sys.exit(255)
+
+
+def get_parser():
+    parser = argparse.ArgumentParser(
+        description="Script to build Q2X model."
+    )
+
+    # sample code to get a hyperparam
+    parser.add_argument("--HPO",
+                        help="Marketplace like us, uk.",
+                        type=int,
+                        default=1)
+
+    #     parser.add_argument("sample_size",
+    #                         help="Marketplace like us, uk.",
+    #                         type=int,
+    #                         default=0)
+
+    return parser
+
+
+if __name__ == "__main__":
+    print('WE IN HERE BBY')
+    args = get_parser().parse_args()
+    train(args)
+    sys.exit(0)
