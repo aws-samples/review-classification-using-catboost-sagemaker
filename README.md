@@ -1,5 +1,5 @@
 ## Implementing a Review classification model with Catboost and SageMaker
-The solution demonstrates a Distributed Learning system implementing Keras custom generator to train on sprase libsvm data.
+The solution demonstrates a Distributed Learning system implementing Catboost using bring your own architecture on Sagemaker.
 
 #### Background
 Data set: Amazon Customer Reviews Dataset
