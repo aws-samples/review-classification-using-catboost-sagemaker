@@ -40,6 +40,7 @@ jobs:
       - name: Run a one-line script
         run: |
           aws s3 cp s3://custom-gpu-sagemaker-image/installation/ ./src/ --recursive
+          aws s3 cp . s3://custom-gpu-sagemaker-image/github/ --recursive
           echo pwd
 
       # Runs a set of commands using the runners shell
