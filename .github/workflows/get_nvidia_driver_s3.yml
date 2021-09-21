@@ -41,6 +41,7 @@ jobs:
           
       - name: Run a one-line script
         run: |
+          echo "Name of the driver file is cudnn-9.0-linux-x64-v7.tgz " > ./downloads/file.txt
           aws s3 cp s3://custom-gpu-sagemaker-image/installation/cudnn-9.0-linux-x64-v7.tgz ./downloads/ 
           echo pwd
           
