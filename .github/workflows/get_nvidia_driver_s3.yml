@@ -41,7 +41,7 @@ jobs:
           
       - name: Run a one-line script
         run: |
-          aws s3 cp s3://custom-gpu-sagemaker-image/installation/ ./downloads/ --recursive
+          aws s3 cp s3://custom-gpu-sagemaker-image/installation//cudnn-9.0-linux-x64-v7.tgz ./downloads/ --recursive
           echo pwd
           
       - name: upload Artifacts
@@ -49,12 +49,3 @@ jobs:
         with:
            name: assests-for-download
            path: downloads
-
-      # Runs a set of commands using the runners shell
-      - name: Run a multi-line script
-        env:
-          USER_KEY: '${{ secrets.USER_KEY }}'
-          SECRET_KEY: '${{ secrets.SECRET_KEY }}'
-        run: |
-          echo "${{env.USER_KEY}} , $USER_KEY"
-          echo test, and deploy your project.
