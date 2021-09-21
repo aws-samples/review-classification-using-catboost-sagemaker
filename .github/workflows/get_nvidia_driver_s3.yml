@@ -41,7 +41,7 @@ jobs:
           
       - name: Run a one-line script
         run: |
-          aws s3 cp s3://custom-gpu-sagemaker-image/installation//cudnn-9.0-linux-x64-v7.tgz ./downloads/ --recursive
+          aws s3 cp s3://custom-gpu-sagemaker-image/installation/cudnn-9.0-linux-x64-v7.tgz ./downloads/ --recursive
           echo pwd
           
       - name: upload Artifacts
