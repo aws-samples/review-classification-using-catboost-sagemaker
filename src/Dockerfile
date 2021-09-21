@@ -66,7 +66,8 @@ WORKDIR data
 RUN wget https://developer.nvidia.com/compute/cuda/9.0/Prod/local_installers/cuda_9.0.176_384.81_linux-run \
 && chmod u+x cuda_9.0.176_384.81_linux-run \
 && ./cuda_9.0.176_384.81_linux-run --tmpdir=/data --silent --toolkit --override \
-&& wget https://custom-gpu-sagemaker-image.s3.amazonaws.com/installation/cudnn-9.0-linux-x64-v7.tgz \
+&& wget <virtual-hosted–style access path to the driver>
+#&& wget https://custom-gpu-sagemaker-image.s3.amazonaws.com/installation/cudnn-9.0-linux-x64-v7.tgz \
 && tar -xvzf cudnn-9.0-linux-x64-v7.tgz \
 && cp /data/cuda/include/cudnn.h /usr/local/cuda/include \
 && cp /data/cuda/lib64/libcudnn* /usr/local/cuda/lib64 \
