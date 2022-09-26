@@ -7,27 +7,15 @@
 from __future__ import print_function
 
 import os
-import io
-import re
-import math
+
 import json
 import pickle
 import sys
 import traceback
 import argparse
-import datetime
-import gc
-import glob
-import logging
-import shutil
-import subprocess
-import tempfile
 import time
 import pandas as pd
 import csv
-import joblib
-
-import numpy as np
 from catboost import CatBoostClassifier, Pool as CatboostPool, cv
 from itertools import chain
 from pandas.api.types import CategoricalDtype
@@ -222,26 +210,41 @@ def train(args):
             'depth': max_depth,  # 10
             'learning_rate': learning_rate,  ## 0.05,
             'loss_function': 'Logloss',
-            'eval_metric': 'Logloss',
+            'eval_metric': 'PRAUC:use_weights=False',
             'random_seed': 42,
             'border_count': 254,
             'logging_level': 'Verbose',
             'use_best_model': False,
-            'max_ctr_complexity': max_ctr_complexity,  ##15
             'early_stopping_rounds': 500,  # 10% of the total training epoch is a reasonable choice
             'task_type': "GPU",
             'one_hot_max_size': 253,
             'metric_period': 100,
-            'text_processing': ['0~BoW:top_tokens_count=500+Text_char_3gram_hdline',
-                                '1~BoW:top_tokens_count=5000+Text_char_3gram_body',
-                                '2~BoW:top_tokens_count=500+Text_char_3gram_title'
-                                ],
-            'dictionaries': [
-                'Text_char_3gram_hdline:token_level_type=Letter,max_dict_size=10000,gram_order=3,min_token_occurrence=100',
-                'Text_char_3gram_body:token_level_type=Letter,max_dict_size=100000,gram_order=3,min_token_occurrence=100',
-                'Text_char_3gram_title:token_level_type=Letter,max_dict_size=10000,gram_order=3,min_token_occurrence=100'
-            ]
+            "text_processing": {
+                "tokenizers": [
+                    {
+                        'tokenizer_id': 'Sense',
+                        'separator_type': 'BySense',
+                        "lowercasing": "true",
+
+                    }
+                ],
+                "dictionaries": [{
+                    "dictionary_id": "CharTriGram",
+                    "token_level_type": "Letter",
+                    "gram_order": "3",
+                    "max_dictionary_size": "20000",
+                }],
+                "feature_processing": {
+                    "default": [{
+                        "tokenizers_names": ["Sense"],
+                        "dictionaries_names": ["CharTriGram"],
+                        "feature_calcers": ["BoW:top_tokens_count=1000", "NaiveBayes"]
+                    }]
+                }
+            }
         }
+
+
         model = fit_catboost(train_data[numerical_cols + categorical_cols + text_cols], train_data["target"], weight,
                              catboost_params=params)
 
@@ -283,11 +286,6 @@ def get_parser():
                         help="Marketplace like us, uk.",
                         type=int,
                         default=1)
-
-    #     parser.add_argument("sample_size",
-    #                         help="Marketplace like us, uk.",
-    #                         type=int,
-    #                         default=0)
 
     return parser
 

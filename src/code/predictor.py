@@ -22,7 +22,8 @@ from pandas.api.types import CategoricalDtype
 prefix = '/opt/ml/'
 model_path = os.path.join(prefix, 'model')
 
-all_cols = ['marketplace', 'customer_id', 'review_id','product_id','helpful_votes','verified_purchase','review_headline','review_body','product_title','target']
+all_cols = ['marketplace', 'customer_id', 'review_id', 'product_id', 'helpful_votes', 'verified_purchase',
+            'review_headline', 'review_body', 'product_title', 'target']
 numerical_cols = ['helpful_votes']
 categorical_cols = ['verified_purchase']
 
@@ -31,8 +32,8 @@ text_cols = ['review_headline', 'review_body', 'product_title']
 
 def ret_pool_obj(X):
     pool_obj = CatboostPool(
-        data = X,
-        label = None,
+        data=X,
+        label=None,
         text_features=text_cols,
         cat_features=categorical_cols,
         feature_names=list(X.columns)
@@ -49,16 +50,17 @@ def pre_process(df):
     df.fillna(-9999, inplace=True)
     return df
 
-
     # Convert object columns to pandas categorical
-def pre_process_cat(df, model) :
+
+
+def pre_process_cat(df, model):
     for col_name in categorical_cols:
         # Exclude asin column from converting to categorical
-        #print(col_name)
+        # print(col_name)
         cat_type = CategoricalDtype(categories=model[0].get(col_name), ordered=False)
         df[col_name] = df[col_name].astype(cat_type, copy=False)
         df[col_name].fillna('Unk', inplace=True)
-        
+
     col_names = df.columns
     category_col_names = col_names[df.dtypes == 'category']
     # Fill missing values in new data (categories column) with -9999
@@ -97,10 +99,10 @@ class ScoringService(object):
 
         # dvalid = clf[0].
         prob = model[1].predict_proba(input_pool)[:, 1]
-        #print(prob)
+        # print(prob)
         print('Complete inferencing on', prob.shape, ' records.')
         input['score'] = prob
-        return input[['review_id','target','score']]
+        return input[['review_id', 'target', 'score']]
 
 
 # The flask app for serving predictions
@@ -132,7 +134,8 @@ def transformation():
         # print(len(data))
         print('I am here bby')
         print('length of all_Cols', len(all_cols))
-        data = pd.read_csv(pd.compat.StringIO(data), names=all_cols, sep='\t', lineterminator='\n',escapechar ='\\', quotechar='"', quoting=csv.QUOTE_NONE, keep_default_na=False)
+        data = pd.read_csv(io.StringIO(data), names=all_cols, sep='\t', lineterminator='\n', escapechar='\\',
+                           quotechar='"', quoting=csv.QUOTE_NONE, keep_default_na=False)
 
         print('Column type: (Before Feature Engineering) ', data.dtypes)
         data = pre_process(data)
@@ -149,7 +152,7 @@ def transformation():
     print('columns of predictions :', predictions.columns)
     # Convert from numpy back to CSV
     out = io.StringIO()
-    predictions.to_csv(out, header=False, index=False, sep='\t', quotechar='"',  escapechar ='\\',quoting=csv.QUOTE_NONE)
+    predictions.to_csv(out, header=False, index=False, sep='\t', quotechar='"', escapechar='\\', quoting=csv.QUOTE_NONE)
     result = out.getvalue()
     end = time.time()
 
