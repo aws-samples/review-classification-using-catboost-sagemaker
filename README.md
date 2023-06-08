@@ -35,7 +35,7 @@ Amazon Customer Reviews (a.k.a. Product Reviews) is one of Amazon’s iconic pro
     	     2. Not even worth watching for free.  Terrible.  Horrible.  Very Bad.  Should never have been made.  Waste of time.  Crap.  Trash.  Couldn't even finish it.
              3. Why can't I give this no stars? Absolute garbage, stupid, boring, poorly written, bad acting, and terrible direction. I won’t waste another word on this trash. I already lost a couple of hours on my life. Stare at a wall for 2 hours instead of watching this.
              4.Terrible. Poorly written.  Predictable.  Disappointed.
-             5.Horrible.  Slow. Boring.  What a disappointment.
+             5.Horrible. Slow. Boring.  What a disappointment.
 ## Security
 
 See [CONTRIBUTING](CONTRIBUTING.md#security-issue-notifications) for more information.
