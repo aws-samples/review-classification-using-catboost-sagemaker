@@ -28,6 +28,7 @@ Amazon Customer Reviews (a.k.a. Product Reviews) is one of Amazon’s iconic pro
        	   3. Excellent!  So much fun!  Great movie!!  We LOVED it!!
            4. Fantastic Series! I love it! I'm on Season 4!!!!!!!!!!!!!!!! AAA++++++++++++++++++++++++++++++++++++++=
            5. Excellent. Awesome. Amazing. LOVE THE SHOW!!!!!!!
+           6. Nice Movie
        
      ###### Reviews classified as Bad by the model
 
